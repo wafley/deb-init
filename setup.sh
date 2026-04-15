@@ -219,25 +219,32 @@ setup_python_orchestrator() {
 
     log info "Setting up Python virtual environment..."
     
+    # Create venv if it doesn't exist
     if [ ! -d "$VENV_PATH" ]; then
         python3 -m venv "$VENV_PATH"
-        # FIX: Change ownership to the real user immediately
         chown -R "$REAL_USER":"$REAL_USER" "$VENV_PATH"
-        log success "Virtual environment created"
+        log success "Virtual environment created."
     fi
 
-    # Creating a placeholder requirements.txt if not exists
+    # Safety Check/Fallback for requirements.txt
     if [ ! -f "requirements.txt" ]; then
-        log warn "requirements.txt not found. Creating default..."
+        log warn "requirements.txt not found. Generating default..."
         echo -e "rich==13.7.0\nPyYAML==6.0.1" > requirements.txt
+        # Make sure the user owns the file it created
+        chown "$REAL_USER":"$REAL_USER" requirements.txt
     fi
 
     log info "Installing requirements..."
-    # FIX: Run pip as the real user, not root
-    sudo -u "$REAL_USER" "$VENV_PATH/bin/pip" install -q --upgrade pip
-    sudo -u "$REAL_USER" "$VENV_PATH/bin/pip" install -q -r requirements.txt
     
-    log success "Python environment is ready (Owner: $REAL_USER)."
+    # 3. Upgrade Pip & Install requirements as the REAL_USER
+    sudo -u "$REAL_USER" "$VENV_PATH/bin/pip" install -q --upgrade pip
+    
+    if sudo -u "$REAL_USER" "$VENV_PATH/bin/pip" install -q -r requirements.txt; then
+        log success "Python environment is ready (Owner: $REAL_USER)."
+    else
+        log error "Failed to install Python dependencies."
+        exit 1
+    fi
 }
 
 # ? [Executes the main Python automation entry point]
