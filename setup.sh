@@ -134,23 +134,33 @@ configure_user_permissions() {
     REAL_USER=${SUDO_USER:-$(id -nu 1000 2>/dev/null || echo "")}
 
     if [[ -z "$REAL_USER" ]]; then
-        log_warn "Could not identify local user. Skipping sudoers config."
+        log warn "Could not identify local user. Skipping sudoers config."
         return
     fi
 
-    # Add to sudo group
+    # Add to sudo group (Standard practice)
     if ! groups "$REAL_USER" | grep &>/dev/null "\bsudo\b"; then
         log info "Adding user '$REAL_USER' to sudo group..."
         usermod -aG sudo "$REAL_USER"
         log success "User '$REAL_USER' added to sudo group."
     fi
 
-    # Apply NOPASSWD for seamless automation
-    if [ ! -f "$SUDOERS_FILE" ]; then
-        log info "Applying NOPASSWD policy for '$REAL_USER'..."
-        echo "$REAL_USER ALL=(ALL) NOPASSWD:ALL" > "$SUDOERS_FILE"
-        chmod 0440 "$SUDOERS_FILE"
-        log success "Sudoers policy applied."
+    # Apply TEMPORARY NOPASSWD policy
+    # We use a specific name to make it easy to clean up later
+    log warn "Applying temporary NOPASSWD policy for automation..."
+    echo "$REAL_USER ALL=(ALL) NOPASSWD:ALL" > "$SUDOERS_FILE"
+    chmod 0440 "$SUDOERS_FILE"
+    
+    # Create a 'cleanup' flag/marker for the Python orchestrator
+    log success "Temporary sudoers policy applied (Will be revoked after setup)."
+}
+
+# ? [Removes temporary sudoers configuration and restores default security state]
+cleanup_permissions() {
+    if [ -f "$SUDOERS_FILE" ]; then
+        log info "Revoking temporary sudoers policy..."
+        rm -f "$SUDOERS_FILE"
+        log success "Security policy restored to default."
     fi
 }
 
@@ -204,31 +214,41 @@ bootstrap_environment() {
 
 # ? [Sets up Python virtual environment and installs dependencies]
 setup_python_orchestrator() {
+    local REAL_USER
+    REAL_USER=${SUDO_USER:-$(id -nu 1000)}
+
     log info "Setting up Python virtual environment..."
     
     if [ ! -d "$VENV_PATH" ]; then
         python3 -m venv "$VENV_PATH"
-        log success "Virtual environment created."
+        # FIX: Change ownership to the real user immediately
+        chown -R "$REAL_USER":"$REAL_USER" "$VENV_PATH"
+        log success "Virtual environment created"
     fi
 
-    log info "Upgrading pip and installing requirements..."
-    "$VENV_PATH/bin/pip" install -q --upgrade pip
-    
     # Creating a placeholder requirements.txt if not exists
     if [ ! -f "requirements.txt" ]; then
         log warn "requirements.txt not found. Creating default..."
         echo -e "rich==13.7.0\nPyYAML==6.0.1" > requirements.txt
     fi
 
-    "$VENV_PATH/bin/pip" install -q -r requirements.txt
-    log success "Python environment is ready."
+    log info "Installing requirements..."
+    # FIX: Run pip as the real user, not root
+    sudo -u "$REAL_USER" "$VENV_PATH/bin/pip" install -q --upgrade pip
+    sudo -u "$REAL_USER" "$VENV_PATH/bin/pip" install -q -r requirements.txt
+    
+    log success "Python environment is ready (Owner: $REAL_USER)."
 }
 
 # ? [Executes the main Python automation entry point]
 run_python_main() {
+    local REAL_USER
+    REAL_USER=${SUDO_USER:-$(id -nu 1000)}
+
     if [ -f "core/main.py" ]; then
-        log info "Handing over to Python Orchestrator...\n"
-        "$VENV_PATH/bin/python" core/main.py
+        log info "Handing over to Python Orchestrator as user: $REAL_USER...\n"
+        # FIX: Run the main logic without root privileges
+        sudo -u "$REAL_USER" "$VENV_PATH/bin/python" core/main.py
     else
         log error "Entry point 'core/main.py' not found!"
         exit 1
@@ -250,6 +270,9 @@ main() {
     bootstrap_environment
     setup_python_orchestrator
     run_python_main
+
+    # Policy revoked after Python finishes
+    cleanup_permissions
 }
 
 main "$@"
