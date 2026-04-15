@@ -3,18 +3,22 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from .logger import console
 
 def run_task(description, command):
-    """Execute shell commands with a stylish spinner."""
+    """Run a command with a loading spinner."""
+
+    # Start a progress spinner
     with Progress(
         SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
+        TextColumn("{task.description}"),
         transient=True,
     ) as progress:
+        # Create a task (no progress bar, just spinner)
         task_id = progress.add_task(
-            description=f"[info]{description}...[/info]",
+            description=f"{description}...",
             total=None
         )
 
         try:
+            # Run the command
             process = subprocess.run(
                 command,
                 shell=True,
@@ -24,17 +28,26 @@ def run_task(description, command):
                 text=True
             )
 
+            # Stop and remove spinner after success
             progress.stop_task(task_id)
             progress.remove_task(task_id)
 
-            console.print(f"[success]\n✔[/success] {description}")
+            # Show success message
+            console.print(f"✔ {description}")
+
+            # Return command output
             return process.stdout
 
         except subprocess.CalledProcessError as e:
+            # Stop and remove spinner if error happens
             progress.stop_task(task_id)
             progress.remove_task(task_id)
 
-            console.print(f"[error]\n✘[/error] Failed: {description}")
+            # Show error message
+            console.print(f"✘ Failed: {description}")
+
+            # Show error details if available
             if e.stderr:
-                console.print(f"[dim red]{e.stderr.strip()}[/dim red]")
+                console.print(e.stderr.strip())
+
             raise

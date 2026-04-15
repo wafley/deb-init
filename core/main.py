@@ -6,9 +6,10 @@ from utils.runner import run_task
 
 class DebianOrchestrator:
     def __init__(self):
-        self.version = "1.0.0"
+        self.version = "1.0.0"  # Application version
 
     def display_banner(self):
+        # Render entry banner with version
         console.print(Panel(
             "[bold white]Debian 13 Python Orchestrator[/bold white]\n"
             "[dim]Select a module to begin the automation process[/dim]",
@@ -18,14 +19,18 @@ class DebianOrchestrator:
         ))
 
     def handle_choice(self, choice):
-        """Logic to handle each menu option."""
+        """Dispatch menu selection."""
+
+        # Exit condition
         if choice == "0. Keluar" or choice is None:
             console.print("[warn]Exiting. See you![/warn]")
             sys.exit(0)
-            
+
+        # Log selected action
         console.print(f"\n[info]Executing:[/info] [bold]{choice}[/bold]\n")
 
         try:
+            # Naive routing based on label prefix
             if "1." in choice:
                 pass
             elif "2." in choice:
@@ -38,18 +43,23 @@ class DebianOrchestrator:
                 pass
             elif "6." in choice:
                 pass
-            
-            console.print("\n[success]✔ Task completed![/success]\n")
+
+            # Success path
+            console.print("\n✔ Task completed!\n")
             sys.exit(0)
-        except Exception as e:
+
+        except Exception:
+            # Generic failure handler
             console.print(f"\n[error]Gagal menjalankan {choice}[/error]")
 
     def start(self):
+        # Main event loop
         while True:
             self.display_banner()
             choice = show_main_menu()
             self.handle_choice(choice)
 
 if __name__ == "__main__":
+    # Bootstrap entrypoint
     orchestrator = DebianOrchestrator()
     orchestrator.start()
