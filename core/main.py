@@ -2,18 +2,23 @@ import sys
 from rich.panel import Panel
 from utils.logger import console
 from utils.menu import show_main_menu
-from utils.runner import run_task
+from utils.config_loader import settings
 
 class DebianOrchestrator:
     def __init__(self):
-        self.version = "1.0.0"  # Application version
+        # Get app data from settings.yaml
+        # Use .get() to be safe if the key is not in the YAML
+        self.app_config = settings.get('app', {})
+        self.version = self.app_config.get('version', '0.0.0')
+        self.name = self.app_config.get('name', 'Debian Automator')
+        self.description = self.app_config.get('description', 'Automation tool')
 
     def display_banner(self):
         # Render entry banner with version
         console.print(Panel(
-            "[bold white]Debian 13 Python Orchestrator[/bold white]\n"
-            "[dim]Select a module to begin the automation process[/dim]",
-            title="[success]v" + self.version + "[/success]",
+            f"[bold white]{self.name}[/bold white]\n"
+            f"[dim]{self.description}[/dim]",
+            title=f"[success]v{self.version}[/success]",
             border_style="blue",
             expand=False
         ))
