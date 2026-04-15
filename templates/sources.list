@@ -1,0 +1,11 @@
+# Debian Trixie - Mirror UNAIR
+deb http://mirror.unair.ac.id/debian/ trixie main contrib non-free non-free-firmware
+deb-src http://mirror.unair.ac.id/debian/ trixie main contrib non-free non-free-firmware
+
+# Security Updates
+deb http://security.debian.org/debian-security trixie-security main contrib non-free non-free-firmware
+deb-src http://security.debian.org/debian-security trixie-security main contrib non-free non-free-firmware
+
+# Trixie Updates
+deb http://mirror.unair.ac.id/debian/ trixie-updates main contrib non-free non-free-firmware
+deb-src http://mirror.unair.ac.id/debian/ trixie-updates main contrib non-free non-free-firmware

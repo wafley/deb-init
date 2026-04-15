@@ -83,6 +83,27 @@ configure_user_permissions() {
     fi
 }
 
+readonly REPO_TEMPLATE="./templates/sources.list"
+configure_repositories() {
+    log_info "Configuring Debian Trixie repositories from template..."
+
+    # Check if template exists
+    if [ ! -f "$REPO_TEMPLATE" ]; then
+        log_error "Repository template not found at $REPO_TEMPLATE!"
+        exit 1
+    fi
+
+    # Backup original sources.list
+    if [ ! -f "/etc/apt/sources.list.bak" ]; then
+        cp /etc/apt/sources.list /etc/apt/sources.list.bak
+        log_success "Backup created: /etc/apt/sources.list.bak"
+    fi
+
+    # Deploy template
+    cp "$REPO_TEMPLATE" /etc/apt/sources.list
+    log_success "Repositories configured using UNAIR mirror."
+}
+
 # Main Execution
 main() {
     clear
@@ -93,6 +114,7 @@ main() {
     check_root_access
     setup_sudo
     configure_user_permissions
+    configure_repositories
 }
 
 main "$@"
