@@ -19,10 +19,38 @@ readonly SUDOERS_FILE="/etc/sudoers.d/99-automation-tool"
 readonly MIRROR_URL="mirror.unair.ac.id"
 
 # Logging Functions
-log_info()    { echo -e "${C_INFO}[INFO]${C_RESET}    $1"; }
-log_success() { echo -e "${C_SUCCESS}[SUCCESS]${C_RESET} $1"; }
-log_error()   { echo -e "${C_ERROR}[ERROR]${C_RESET}   $1"; }
-log_warn()    { echo -e "${C_WARN}[WARN]${C_RESET}    $1"; }
+log() {
+    local level="$1"
+    local message="$2"
+
+    local color=""
+    local label=""
+
+    case "$level" in
+        info)
+            color="$C_INFO"
+            label="INFO"
+            ;;
+        success)
+            color="$C_SUCCESS"
+            label="SUCCESS"
+            ;;
+        warn)
+            color="$C_WARN"
+            label="WARN"
+            ;;
+        error)
+            color="$C_ERROR"
+            label="ERROR"
+            ;;
+        *)
+            color="$C_RESET"
+            label="LOG"
+            ;;
+    esac
+
+    printf "%b[%-7s]%b %s\n" "$color" "$label" "$C_RESET" "$message"
+}
 
 # Signal Handling
 cleanup() {
@@ -34,7 +62,7 @@ trap cleanup SIGINT SIGTERM
 # Core Functions
 
 check_root_access() {
-    log_info "Validating system access..."
+    log info "Validating system access..."
     if [[ $EUID -ne 0 ]]; then
         log_error "Access denied. Root privileges are required."
         if ! command -v sudo &> /dev/null; then
@@ -46,7 +74,7 @@ check_root_access() {
         fi
         exit 1
     fi
-    log_success "Root privileges verified."
+    log success "Root privileges verified."
 }
 
 setup_sudo() {
@@ -54,7 +82,7 @@ setup_sudo() {
         log_warn "'sudo' not found. Installing automatically..."
         apt-get update -y -qq > /dev/null
         apt-get install -y -qq sudo &> /dev/null
-        log_success "The 'sudo' package has been installed."
+        log success "The 'sudo' package has been installed."
     fi
 }
 
@@ -69,39 +97,39 @@ configure_user_permissions() {
 
     # Add to sudo group
     if ! groups "$REAL_USER" | grep &>/dev/null "\bsudo\b"; then
-        log_info "Adding user '$REAL_USER' to sudo group..."
+        log info "Adding user '$REAL_USER' to sudo group..."
         usermod -aG sudo "$REAL_USER"
-        log_success "User '$REAL_USER' added to sudo group."
+        log success "User '$REAL_USER' added to sudo group."
     fi
 
     # Apply NOPASSWD for seamless automation
     if [ ! -f "$SUDOERS_FILE" ]; then
-        log_info "Applying NOPASSWD policy for '$REAL_USER'..."
+        log info "Applying NOPASSWD policy for '$REAL_USER'..."
         echo "$REAL_USER ALL=(ALL) NOPASSWD:ALL" > "$SUDOERS_FILE"
         chmod 0440 "$SUDOERS_FILE"
-        log_success "Sudoers policy applied."
+        log success "Sudoers policy applied."
     fi
 }
 
 readonly REPO_TEMPLATE="./templates/sources.list"
 configure_repositories() {
-    log_info "Configuring Debian Trixie repositories from template..."
+    log info "Configuring Debian Trixie repositories from template..."
 
     # Check if template exists
     if [ ! -f "$REPO_TEMPLATE" ]; then
-        log_error "Repository template not found at $REPO_TEMPLATE!"
+        log error "Repository template not found at $REPO_TEMPLATE!"
         exit 1
     fi
 
     # Backup original sources.list
     if [ ! -f "/etc/apt/sources.list.bak" ]; then
         cp /etc/apt/sources.list /etc/apt/sources.list.bak
-        log_success "Backup created: /etc/apt/sources.list.bak"
+        log success "Backup created: /etc/apt/sources.list.bak"
     fi
 
     # Deploy template
     cp "$REPO_TEMPLATE" /etc/apt/sources.list
-    log_success "Repositories configured using UNAIR mirror."
+    log success "Repositories configured using UNAIR mirror."
 }
 
 # Main Execution
