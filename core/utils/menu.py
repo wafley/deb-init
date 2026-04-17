@@ -4,18 +4,18 @@ from .logger import console
 def show_main_menu():
     """Displays the selection menu using the arrow keys."""
     choices = [
-        "1. Basic System Setup",
-        "2. Development Environment",
-        "3. Desktop & UI",
-        "4. General Settings",
-        "5. Additional Tools",
-        "6. Run All (Full Setup)",
+        "Basic System Setup",
+        "Development Environment",
+        "Desktop & UI",
+        "General Settings",
+        "Additional Tools",
+        "Run All (Full Setup)",
         questionary.Separator(), # Boundary lines to keep things neat
-        "0. Keluar"
+        "Quit"
     ]
     
     answer = questionary.select(
-        "Pilih modul yang ingin dijalankan:",
+        "Select the module you want to run:",
         choices=choices,
         use_arrow_keys=True,
         style=questionary.Style([

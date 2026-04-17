@@ -163,7 +163,7 @@ setup_python_orchestrator() {
 run_python_main() {
     local main_script="core/main.py"
     if [[ -f "$main_script" ]]; then
-        log info "Launching Orchestrator...\n"
+        log info "Launching Orchestrator..."
         as_user "$VENV_PATH/bin/python" "$main_script"
     else
         log error "Missing: $main_script"
