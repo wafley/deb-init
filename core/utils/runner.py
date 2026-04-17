@@ -2,53 +2,42 @@ import subprocess
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from .logger import console
 
-def run_task(description, command):
-    """Run a command with a loading spinner."""
 
-    # Start a progress spinner
+def run_task(description, command, show_output=False):
+    """Run a command with a clean CLI-style spinner."""
+
     with Progress(
         SpinnerColumn(),
         TextColumn("{task.description}"),
+        transient=True,  # 👈 penting: hilangkan jejak spinner
+        console=console,
     ) as progress:
-        # Create a task (no progress bar, just spinner)
-        task_id = progress.add_task(
-            description = f"{description}...",
-            total = None
-        )
+
+        task_id = progress.add_task(f"{description}...", total=None)
 
         try:
-            # Run the command
-            process = subprocess.run(
+            result = subprocess.run(
                 command,
-                shell = True,
-                check = True,
-                stdout = subprocess.PIPE,
-                stderr = subprocess.PIPE,
-                text = True
+                shell=True,
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
             )
 
-            # Stop and remove spinner after success
-            progress.stop_task(task_id)
-            progress.remove_task(task_id)
-
-            # Show success message
-            progress.console.print()
-            progress.console.print(f"✔ {description}")
-
-            # Return command output
-            return process.stdout
-
         except subprocess.CalledProcessError as e:
-            # Stop and remove spinner if error happens
-            progress.stop_task(task_id)
-            progress.remove_task(task_id)
+            # Spinner otomatis hilang karena transient=True
+            console.print(f"[red]✘ Failed:[/red] {description}")
 
-            # Show error message
-            console.print(f"✘ Failed: {description}")
-
-            # Show error details if available
             if e.stderr:
-                progress.console.print()
-                progress.console.print(e.stderr.strip())
+                console.print(e.stderr.strip())
 
             raise
+
+    # 👇 keluar dari `with` = spinner sudah bersih
+    console.print(f"[green]✔[/green] {description}")
+
+    if show_output and result.stdout:
+        console.print(result.stdout.rstrip())
+
+    return result.stdout
