@@ -1,0 +1,24 @@
+basic:
+    timezone: "Asia/Jakarta"
+    locale: "en_US.UTF-8"
+    core_packages:
+        - build-essential
+        - curl
+        - wget
+        - git
+        - unzip
+        - fontconfig
+        - gnupg
+    additional_packages:
+        - htop
+        - fastfetch
+        - ufw
+        - rsync
+        - tmux
+    fonts:
+        - name: "Inter"
+          url: "https://github.com/rsms/inter/releases/download/v4.0/Inter-4.0.zip"
+        - name: "HackNerdFont"
+          url: "https://github.com/ryanoasis/nerd-fonts/releases/latest/download/Hack.zip"
+        - name: "FiraCode"
+          url: "https://github.com/tonsky/FiraCode/releases/download/6.2/Fira_Code_v6.2.zip"

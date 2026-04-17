@@ -2,16 +2,19 @@ import sys
 from rich.panel import Panel
 from utils.logger import console
 from utils.menu import show_main_menu
-from utils.config_loader import settings
+from utils.config_loader import get_config
+
+# Modules
+from modules.basic import BasicSetup
 
 class DebianOrchestrator:
     def __init__(self):
         # Get app data from settings.yaml
         # Use .get() to be safe if the key is not in the YAML
-        self.app_config = settings.get('app', {})
-        self.version = self.app_config.get('version', '0.0.0')
-        self.name = self.app_config.get('name', 'Debian Automator')
-        self.description = self.app_config.get('description', 'Automation tool')
+        self.config = get_config("app").get('app', {})
+        self.version = self.config.get('version', '0.0.0')
+        self.name = self.config.get('name', 'Debian Automator')
+        self.description = self.config.get('description', 'Automation tool')
 
     def display_banner(self):
         # Render entry banner with version
@@ -27,7 +30,7 @@ class DebianOrchestrator:
         """Dispatch menu selection."""
 
         # Exit condition
-        if choice == "0. Keluar" or choice is None:
+        if choice == "Quit" or choice is None:
             console.print("[warn]Exiting. See you![/warn]")
             sys.exit(0)
 
@@ -36,8 +39,9 @@ class DebianOrchestrator:
 
         try:
             # Naive routing based on label prefix
-            if "1." in choice:
-                pass
+            if "Basic System Setup" in choice:
+                setup = BasicSetup()
+                setup.run()
             elif "2." in choice:
                 pass
             elif "3." in choice:
@@ -55,7 +59,7 @@ class DebianOrchestrator:
 
         except Exception:
             # Generic failure handler
-            console.print(f"\n[error]Gagal menjalankan {choice}[/error]")
+            console.print(f"\n[error]Failed to run {choice}[/error]")
 
     def start(self):
         # Main event loop
