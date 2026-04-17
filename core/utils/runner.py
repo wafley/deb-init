@@ -9,7 +9,6 @@ def run_task(description, command):
     with Progress(
         SpinnerColumn(),
         TextColumn("{task.description}"),
-        transient=True,
     ) as progress:
         # Create a task (no progress bar, just spinner)
         task_id = progress.add_task(
@@ -33,7 +32,8 @@ def run_task(description, command):
             progress.remove_task(task_id)
 
             # Show success message
-            console.print(f"✔ {description}")
+            progress.console.print()
+            progress.console.print(f"✔ {description}")
 
             # Return command output
             return process.stdout
@@ -48,6 +48,7 @@ def run_task(description, command):
 
             # Show error details if available
             if e.stderr:
-                console.print(e.stderr.strip())
+                progress.console.print()
+                progress.console.print(e.stderr.strip())
 
             raise
