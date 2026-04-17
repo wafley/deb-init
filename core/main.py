@@ -18,9 +18,9 @@ class DebianOrchestrator:
         console.print(Panel(
             f"[bold white]{self.name}[/bold white]\n"
             f"[dim]{self.description}[/dim]",
-            title=f"[success]v{self.version}[/success]",
-            border_style="blue",
-            expand=False
+            title = f"[success]v{self.version}[/success]",
+            border_style = "blue",
+            expand = False
         ))
 
     def handle_choice(self, choice):

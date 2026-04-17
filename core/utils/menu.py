@@ -1,5 +1,4 @@
 import questionary
-from .logger import console
 
 def show_main_menu():
     """Displays the selection menu using the arrow keys."""
@@ -16,9 +15,9 @@ def show_main_menu():
     
     answer = questionary.select(
         "Select the module you want to run:",
-        choices=choices,
-        use_arrow_keys=True,
-        style=questionary.Style([
+        choices = choices,
+        use_arrow_keys = True,
+        style = questionary.Style([
             ('qmark', 'fg:#673ab7 bold'),       # Question mark color
             ('question', 'bold'),               # Question color
             ('answer', 'fg:#f44336 bold'),      # Selected answer color

@@ -9,4 +9,4 @@ custom_theme = Theme({
     "highlight": "bold magenta"
 })
 
-console = Console(theme=custom_theme)
+console = Console(theme = custom_theme)

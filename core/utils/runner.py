@@ -13,19 +13,19 @@ def run_task(description, command):
     ) as progress:
         # Create a task (no progress bar, just spinner)
         task_id = progress.add_task(
-            description=f"{description}...",
-            total=None
+            description = f"{description}...",
+            total = None
         )
 
         try:
             # Run the command
             process = subprocess.run(
                 command,
-                shell=True,
-                check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
+                shell = True,
+                check = True,
+                stdout = subprocess.PIPE,
+                stderr = subprocess.PIPE,
+                text = True
             )
 
             # Stop and remove spinner after success
