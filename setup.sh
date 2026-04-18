@@ -10,14 +10,12 @@ readonly C_ERROR='\e[1;31m'
 readonly C_WARN='\e[1;33m'
 
 readonly VENV_PATH="./.venv"
-readonly SUDOERS_FILE="/etc/sudoers.d/99-automation-tool"
 readonly MIRROR_URL="mirror.unair.ac.id"
 readonly REPO_TEMPLATE="./templates/sources.list"
 
-# Global variable for the non-root user
 REAL_USER=""
 
-# ===== Logging Functions =====
+# ===== Logging =====
 log() {
     local level="$1" message="$2" color="" label=""
     case "$level" in
@@ -29,172 +27,150 @@ log() {
     printf "%b[%-7s]%b %s\n" "$color" "$label" "$C_RESET" "$message"
 }
 
-# ===== Signal Handling =====
-cleanup() {
-    echo -e "\n${C_WARN}[!] Process interrupted. Cleaning up...${C_RESET}"
-    exit 1
-}
-trap cleanup SIGINT SIGTERM
-
-# ===== Helper Functions =====
-# ? [Get current terminal user (non-root)]
+# ===== Stage Detection =====
 get_real_user() {
-    REAL_USER=${SUDO_USER:-$(id -nu 1000 2>/dev/null || echo "")}
-    if [[ -z "$REAL_USER" ]]; then
-        log error "Could not identify local user."
+    if [[ -n "${SUDO_USER:-}" ]]; then
+        REAL_USER="$SUDO_USER"
+    else
+        REAL_USER="$(logname 2>/dev/null || true)"
+    fi
+
+    if [[ -z "$REAL_USER" || "$REAL_USER" == "root" ]]; then
+        log error "Unable to determine non-root user."
         exit 1
     fi
 }
 
-# ? [Wrapper for running commands as the real user]
-as_user() {
-    sudo -u "$REAL_USER" "$@"
+# ===== Post-Sudo Reboot Prompt =====
+prompt_reboot() {
+    echo
+    log warn "System reboot is required for sudo group changes to take effect."
+    echo
+    echo "After reboot:"
+    echo "➔ Login as your normal user (NOT root)"
+    echo "➔ Run this script again: sudo ./setup.sh"
+    echo
+
+    read -rp "Reboot now? [Y/n]: " choice
+
+    case "${choice:-Y}" in
+        Y|y|"")
+            log info "Rebooting system..."
+            /sbin/reboot
+            ;;
+        N|n)
+            log warn "Please reboot manually before running the script again."
+            exit 0
+            ;;
+        *)
+            log warn "Invalid input. Please run the script again after reboot."
+            exit 1
+            ;;
+    esac
 }
 
-# ===== Banner =====
-print_banner() {
-    local term_width
-    local title subtitle author_plain
-    local title_colored subtitle_colored author_display
-
-    term_width=$(tput cols 2>/dev/null || echo 80)
-
-    title="Debian 13 Automation Bootstrap"
-    subtitle="Automate smarter, start faster"
-    author_plain="Created by wafley"
-
-    title_colored="${C_SUCCESS}${title}${C_RESET}"
-    subtitle_colored="${C_INFO}${subtitle}${C_RESET}"
-    author_display="${C_WARN}Created by \e]8;;https://github.com/wafley\a${C_SUCCESS}wafley${C_WARN}\e]8;;\a${C_RESET}"
-
-    center_text() {
-        local display_text="$1"
-        local plain_text="$2"
-        local padding=$(( (term_width - ${#plain_text}) / 2 ))
-        printf "%*s%b\n" "$padding" "" "$display_text"
-    }
-
-    printf "${C_INFO}%*s${C_RESET}\n" "$term_width" '' | tr ' ' '═'
-
-    center_text "$title_colored" "$title"
-    center_text "$subtitle_colored" "$subtitle"
-    center_text "$author_display" "$author_plain"
-
-    printf "${C_INFO}%*s${C_RESET}\n\n" "$term_width" '' | tr ' ' '═'
-}
-
-# ===== Core Functions =====
-# ? [Ensure script is executed with root privileges]
-check_root_access() {
-    log info "Validating system access..."
+# ===== Stage 1 → Elevate to root =====
+ensure_root() {
     if [[ $EUID -ne 0 ]]; then
-        log error "Root privileges required."
-        [[ ! -x "$(command -v sudo)" ]] && log warn "Log in as root: su -" || log warn "Run: sudo $0"
-        exit 1
-    fi
-    log success "Root privileges verified."
-}
-
-# ? [Install sudo if not already available]
-setup_sudo() {
-    if ! command -v sudo &>/dev/null; then
-        log warn "Installing sudo..."
-        apt-get update -y -qq >/dev/null
-        apt-get install -y -qq sudo &>/dev/null
+        log warn "Root privileges required."
+        echo
+        echo "➔ Please enter ROOT password to continue..."
+        exec su -c "$0 $*"
     fi
 }
 
-# ? [Configure user to have sudo access and temporary passwordless execution]
-configure_user_permissions() {
-    if ! groups "$REAL_USER" | grep -q "\bsudo\b"; then
-        log info "Granting sudo group to $REAL_USER..."
-        usermod -aG sudo "$REAL_USER"
-    fi
+# ===== Stage 2 =====
+add_user_to_sudo() {
+    if id -nG "$REAL_USER" | grep -qw sudo; then
+        log info "$REAL_USER already in sudo group."
+        return 1
+    else
+        log info "Adding $REAL_USER to sudo group..."
 
-    log warn "Applying temporary NOPASSWD policy..."
-    echo "$REAL_USER ALL=(ALL) NOPASSWD:ALL" > "$SUDOERS_FILE"
-    chmod 0440 "$SUDOERS_FILE"
+        echo "$REAL_USER ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/wafley"
+        /usr/sbin/usermod -aG sudo "$REAL_USER"
+        chmod 0440 "/etc/sudoers.d/wafley"
+
+        log success "User added to sudo group."
+        return 0
+    fi
 }
 
-# ? [Replace default APT repositories using predefined mirror template]
 configure_repositories() {
-    [[ ! -f "$REPO_TEMPLATE" ]] && { log error "Template missing: $REPO_TEMPLATE"; exit 1; }
-    
-    log info "Updating sources.list via UNAIR mirror..."
-    [[ ! -f "/etc/apt/sources.list.bak" ]] && cp /etc/apt/sources.list /etc/apt/sources.list.bak
-    
+    [[ ! -f "$REPO_TEMPLATE" ]] && { log error "Missing template"; exit 1; }
+
+    log info "Updating APT sources..."
+    cp /etc/apt/sources.list /etc/apt/sources.list.bak 2>/dev/null || true
     cp "$REPO_TEMPLATE" /etc/apt/sources.list
     log success "Repositories configured."
 }
 
-# ? [Verify network connectivity to the selected mirror]
 check_network() {
-    log info "Testing network ($MIRROR_URL)..."
-    ping -c 3 -W 2 "$MIRROR_URL" &>/dev/null || { log error "Network unstable."; exit 1; }
-    log success "Network online."
+    log info "Checking network..."
+    ping -c 3 -W 2 "$MIRROR_URL" &>/dev/null || {
+        log error "Network unreachable."
+        exit 1
+    }
+    log success "Network OK."
 }
 
-# ? [Install required base packages (Python, pip, git, curl)]
-bootstrap_environment() {
-    log info "Installing Python & Git..."
+bootstrap_packages() {
+    log info "Installing base packages..."
     export DEBIAN_FRONTEND=noninteractive
-    apt-get update -y -qq >/dev/null
-    apt-get install -y -qq python3 python3-venv python3-pip curl git &>/dev/null
+    apt-get update -qq
+    apt-get install -y -qq sudo python3 python3-venv python3-pip git curl
+    log success "Packages installed."
 }
 
-# ? [Prepare Python virtual environment and install dependencies]
-setup_python_orchestrator() {
-    log info "Setting up Venv..."
-    [[ ! -d "$VENV_PATH" ]] && { python3 -m venv "$VENV_PATH"; chown -R "$REAL_USER":"$REAL_USER" "$VENV_PATH"; }
+setup_python() {
+    log info "Setting up Python environment..."
+
+    if [[ ! -d "$VENV_PATH" ]]; then
+        python3 -m venv "$VENV_PATH"
+        chown -R "$REAL_USER":"$REAL_USER" "$VENV_PATH"
+    fi
 
     if [[ ! -f "requirements.txt" ]]; then
-        log warn "Generating default requirements.txt..."
-        echo -e "rich==13.7.0\nPyYAML==6.0.1" > requirements.txt
+        echo -e "rich\nPyYAML" > requirements.txt
         chown "$REAL_USER":"$REAL_USER" requirements.txt
     fi
 
-    log info "Installing dependencies as $REAL_USER..."
-    as_user "$VENV_PATH/bin/pip" install -q --upgrade pip
-    as_user "$VENV_PATH/bin/pip" install -q -r requirements.txt
-    log success "Python environment ready."
+    sudo -u "$REAL_USER" "$VENV_PATH/bin/pip" install -q --upgrade pip
+    sudo -u "$REAL_USER" "$VENV_PATH/bin/pip" install -q -r requirements.txt
+
+    log success "Python ready."
 }
 
-# ? [Execute main Python orchestrator script]
-run_python_main() {
+run_main() {
     local main_script="core/main.py"
     if [[ -f "$main_script" ]]; then
-        log info "Launching Orchestrator..."
-        as_user "$VENV_PATH/bin/python" "$main_script"
+        log info "Running orchestrator..."
+        sudo -u "$REAL_USER" "$VENV_PATH/bin/python" "$main_script"
     else
-        log error "Missing: $main_script"
-        exit 1
+        log warn "No orchestrator found."
     fi
 }
 
-# ? [Remove temporary sudo privileges for security cleanup]
-cleanup_permissions() {
-    [[ -f "$SUDOERS_FILE" ]] && { rm -f "$SUDOERS_FILE"; log success "Security policy restored."; }
-}
-
-# ===== Main Execution =====
+# ===== MAIN =====
 main() {
-    clear
-    print_banner
-    
     get_real_user
-    check_root_access
-    setup_sudo
-    configure_user_permissions
+    ensure_root "$@"
+
+    log info "Running as root for user: $REAL_USER"
+
+    bootstrap_packages
+
+    if add_user_to_sudo; then
+        prompt_reboot
+        exit 0
+    fi
+
     configure_repositories
     check_network
-    bootstrap_environment
-    setup_python_orchestrator
+    setup_python
+    run_main
 
-    # Run Orchestrator
-    run_python_main
-
-    # Policy revoked after Python finishes
-    cleanup_permissions
+    log success "Bootstrap complete!"
 }
 
 main "$@"
